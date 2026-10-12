@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>알록달록 색깔 피아노 🎵</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tone.js for Sound Synthesis -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Canvas Confetti for Fireworks Effect -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+        
+        body {
+            font-family: 'Jua', sans-serif;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            word-break: keep-all; /* 한글 단어 단위 줄바꿈 */
+        }
+
+        /* Custom Key Glow Effects */
+        .key-glow-red { box-shadow: 0 0 25px #ef4444, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-orange { box-shadow: 0 0 25px #f97316, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-yellow { box-shadow: 0 0 25px #eab308, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-green { box-shadow: 0 0 25px #22c55e, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-skyblue { box-shadow: 0 0 25px #06b6d4, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-blue { box-shadow: 0 0 25px #3b82f6, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        .key-glow-purple { box-shadow: 0 0 25px #a855f7, inset 0 0 10px rgba(255,255,255,0.5) !important; }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(5deg); }
+        }
+        @keyframes float-reverse {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(-5deg); }
+        }
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .animate-float { animation: float 4s ease-in-out infinite; }
+        .animate-float-reverse { animation: float-reverse 5s ease-in-out infinite; }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+        
+        .note-transition { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        
+        /* New Sliding Note States */
+        .played-note {
+            opacity: 0;
+            transform: scale(0.5);
+        }
+        
+        /* 강조 테두리 (빨간색 두껍게) */
+        .current-note {
+            opacity: 1;
+            transform: scale(1.1);
+            border: 5px solid #ef4444 !important; /* 두꺼운 빨간색 테두리 */
+            box-shadow: 0 0 25px rgba(239,68,68,0.5);
+            z-index: 30;
+        }
+        
+        .upcoming-note {
+            opacity: 0.8;
+            transform: scale(0.9);
+            border: 2px solid #e5e7eb;
+        }
+        
+        /* Background Pattern for Main Screen */
+        .bg-pattern {
+            background-color: #fef3c7;
+            background-image: radial-gradient(#fde68a 2px, transparent 2px), radial-gradient(#fde68a 2px, transparent 2px);
+            background-size: 32px 32px;
+            background-position: 0 0, 16px 16px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 h-[100dvh] w-screen flex items-center justify-center select-none overflow-hidden text-gray-800 p-1 md:p-6">
+
+    <!-- 4:3 App Wrapper (태블릿 꽉 차는 비율) -->
+    <div id="app-wrapper" class="relative w-full aspect-[4/3] max-h-full max-w-[133.33vh] bg-amber-50 overflow-hidden shadow-2xl rounded-xl sm:rounded-2xl md:rounded-[2rem] flex flex-col mx-auto">
+
+        <!-- ================== 화면 1: 메인 시작 화면 ================== -->
+        <div id="screen-main" class="absolute inset-0 bg-pattern flex flex-col items-center justify-center z-50 transition-opacity duration-500">
+            <div class="absolute top-[10%] left-[10%] text-5xl md:text-7xl animate-float opacity-80">🌈</div>
+            <div class="absolute top-[20%] right-[15%] text-4xl md:text-6xl animate-float-reverse opacity-80">🎵</div>
+            <div class="absolute bottom-[25%] left-[15%] text-5xl md:text-7xl animate-float-reverse opacity-80">🎈</div>
+            <div class="absolute bottom-[20%] right-[20%] text-5xl md:text-7xl animate-float opacity-80">🌟</div>
+            <h2 class="text-3xl md:text-5xl text-emerald-600 mb-2 font-bold drop-shadow-sm">재미있는 음악 놀이!</h2>
+            <h1 class="text-6xl md:text-[6rem] text-indigo-600 drop-shadow-lg mb-12 font-black tracking-tight" style="text-shadow: 3px 3px 0 #fff, 6px 6px 0 rgba(0,0,0,0.1);">
+                알록달록<br>색깔 피아노 🎹
+            </h1>
+            
+            <button onclick="startGame()" class="group relative px-12 py-6 bg-rose-500 rounded-full shadow-[0_8px_0_0_#be123c] hover:bg-rose-400 hover:-translate-y-1 hover:shadow-[0_12px_0_0_#be123c] active:translate-y-2 active:shadow-[0_0px_0_0_#be123c] transition-all duration-200">
+                <span class="text-white text-3xl md:text-5xl font-bold tracking-wider group-hover:animate-bounce-slow inline-block">
+                    시작하기 ▶
+                </span>
+            </button>
+        </div>
+
+        <!-- ================== 화면 2: 곡 선택 화면 ================== -->
+        <div id="screen-select" class="absolute inset-0 hidden flex-col items-center justify-start bg-blue-50 py-4 md:py-8 px-4 transition-opacity duration-500 overflow-y-auto z-40">
+            <h1 class="text-3xl md:text-5xl text-indigo-700 font-extrabold mb-6 md:mb-10 drop-shadow-md text-center mt-4 shrink-0">
+                어떤 노래를 연주해볼까요? 🎶
+            </h1>
+            
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8 w-full max-w-5xl px-4 shrink-0">
+                <!-- 나비야 -->
+                <button onclick="selectSongAndPlay('butterfly')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-emerald-200 hover:border-emerald-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">🦋</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-3xl font-bold text-gray-700 text-center leading-tight">나 비 야</div>
+                    </div>
+                </button>
+                <!-- 작은 별 -->
+                <button onclick="selectSongAndPlay('twinkle')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-yellow-200 hover:border-yellow-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">⭐</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-3xl font-bold text-gray-700 text-center leading-tight">작 은 별</div>
+                    </div>
+                </button>
+                <!-- 곰 세마리 -->
+                <button onclick="selectSongAndPlay('bears')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-amber-200 hover:border-amber-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">🐻</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-3xl font-bold text-gray-700 text-center leading-tight">곰 세 마 리</div>
+                    </div>
+                </button>
+                <!-- 사과같은 내얼굴 -->
+                <button onclick="selectSongAndPlay('apple')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-red-200 hover:border-red-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">🍎</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-2xl font-bold text-gray-700 text-center leading-tight">사과같은<br>내 얼굴</div>
+                    </div>
+                </button>
+                <!-- 작은 동물원 -->
+                <button onclick="selectSongAndPlay('zoo')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-orange-200 hover:border-orange-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">🦁</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-2xl font-bold text-gray-700 text-center leading-tight">작 은<br>동 물 원</div>
+                    </div>
+                </button>
+                <!-- 모두 제자리 -->
+                <button onclick="selectSongAndPlay('place')" class="bg-white p-2 md:p-4 rounded-3xl shadow-lg border-4 border-purple-200 hover:border-purple-400 hover:scale-105 transition transform flex flex-row items-center justify-between gap-2 h-28 md:h-36">
+                    <div class="w-[40%] flex justify-center items-center text-5xl md:text-6xl shrink-0">🧸</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-xl md:text-2xl font-bold text-gray-700 text-center leading-tight">모 두<br>제 자 리</div>
+                    </div>
+                </button>
+            </div>
+        
+            <button onclick="selectSongAndPlay('free')" class="mt-8 md:mt-12 px-8 py-4 md:px-10 md:py-5 bg-indigo-500 rounded-full shadow-[0_6px_0_0_#4f46e5] hover:bg-indigo-400 hover:-translate-y-1 hover:shadow-[0_8px_0_0_#4f46e5] active:translate-y-2 active:shadow-none transition-all text-white text-2xl md:text-3xl font-bold mb-8 shrink-0">
+                🎹 내 마음대로 자유 연주하기
+            </button>
+        </div>
+
+        <!-- ================== 화면 3: 피아노 연주 화면 ================== -->
+        <div id="screen-piano" class="absolute inset-0 hidden flex-col items-center justify-between p-3 md:p-6 bg-amber-50 z-40">
+            
+            <!-- Header Controls -->
+            <div class="w-full flex-shrink-0 bg-white rounded-2xl md:rounded-3xl shadow-md p-3 md:p-4 mb-3 flex items-center justify-between gap-3 border-2 md:border-4 border-indigo-100">
+                <button onclick="goBackToSelect()" class="px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl bg-gray-200 text-gray-700 text-sm md:text-xl font-bold shadow hover:bg-gray-300 transition flex items-center gap-2">
+                    <span>◀ 다른 곡 고르기</span>
+                </button>
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleAutoPlay()" id="autoplay-btn" class="px-5 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl bg-emerald-500 text-white text-sm md:text-xl font-bold shadow hover:bg-emerald-600 transition flex items-center gap-2">
+                        <span>✨ 선생님 연주 듣기</span>
+                    </button>
+                    <button onclick="resetSong()" class="px-4 py-2 md:px-6 md:py-3 rounded-xl md:rounded-2xl bg-rose-500 text-white text-sm md:text-xl font-bold shadow hover:bg-rose-600 transition">
+                        🔄 다시 하기
+                    </button>
+                </div>
+            </div>
+
+            <!-- Score Board Container -->
+            <div id="score-container" class="w-full flex-grow bg-white rounded-2xl md:rounded-3xl shadow-xl p-3 md:p-4 mb-3 border-2 md:border-4 border-amber-200 flex flex-col items-center justify-start relative overflow-hidden">
+                
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-100 rounded-full h-3 md:h-4 mb-3 md:mb-4 max-w-5xl border border-gray-200 shadow-inner overflow-hidden flex-shrink-0">
+                    <div id="progress-bar" class="bg-gradient-to-r from-indigo-400 to-purple-500 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+
+                <!-- Main Info & Sheet Area -->
+                <div class="w-full flex-grow flex flex-row gap-2 md:gap-4 max-w-5xl mx-auto h-full items-stretch">
+                    
+                    <!-- Left: Title & Feedback (가로 분리 블록) -->
+                    <div class="w-[35%] md:w-[280px] flex flex-col items-center justify-center bg-indigo-50 rounded-2xl border-2 border-indigo-100 p-2 md:p-4 shrink-0">
+                        
+                        <!-- Title (Icon Left, Text Right) -->
+                        <div id="current-song-title-container" class="flex flex-row items-center justify-between w-full mb-3 md:mb-4 bg-white/60 rounded-xl p-2 md:p-3 shadow-sm border border-indigo-50">
+                            <!-- JS Inject -->
+                        </div>
+                        
+                        <!-- Feedback -->
+                        <div id="feedback-msg" class="text-sm md:text-lg font-extrabold text-indigo-600 transition-all duration-300 animate-bounce-slow text-center w-full">
+                            건반 색깔을 보고 순서대로 쳐보세요! 🎹
+                        </div>
+                    </div>
+
+                    <!-- Right: Sheet notes visualization -->
+                    <div class="flex-grow overflow-hidden relative flex items-center bg-gray-50/50 rounded-2xl inner-shadow border border-gray-100 h-full min-h-[140px] md:min-h-[180px]">
+                        
+                        <!-- ★ 타겟 박스 (위치 28%) ★ -->
+                        <div id="target-box" class="absolute left-[35%] md:left-[28%] top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[70px] h-[70px] md:w-[94px] md:h-[94px] border-[4px] md:border-[5px] border-dashed border-red-400 rounded-3xl z-20 pointer-events-none flex items-center justify-center bg-red-50/20 shadow-sm">
+                        </div>
+
+                        <!-- The moving track -->
+                        <div id="sheet-notes-box" class="flex items-center justify-start gap-4 md:gap-8 flex-nowrap py-4 w-max absolute left-[35%] md:left-[28%] transition-transform duration-500 ease-in-out" style="transform: translateX(0px);">
+                            <!-- Dynamically populated notes -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Piano Keyboard Container -->
+            <div class="w-full flex-shrink-0 h-[35%] md:h-[40%] min-h-[160px] md:min-h-[220px] bg-white rounded-2xl md:rounded-3xl shadow-2xl p-2 md:p-4 flex justify-center items-center relative border-2 md:border-[6px] border-white ring-1 ring-gray-200 overflow-hidden">
+                <div class="relative w-full h-full select-none">
+                    <!-- White Keys -->
+                    <div class="absolute inset-0 flex justify-between w-full h-full gap-1 md:gap-2">
+                        <button data-note="C4" data-color="red" onclick="playKey('C4', 'red')" id="key-C4" class="piano-key flex-1 bg-red-500 hover:bg-red-400 active:bg-red-600 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#b91c1c] md:shadow-[0_8px_0_0_#b91c1c] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">도</span>
+                        </button>
+                        <button data-note="D4" data-color="orange" onclick="playKey('D4', 'orange')" id="key-D4" class="piano-key flex-1 bg-orange-500 hover:bg-orange-400 active:bg-orange-600 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#c2410c] md:shadow-[0_8px_0_0_#c2410c] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">레</span>
+                        </button>
+                        <button data-note="E4" data-color="yellow" onclick="playKey('E4', 'yellow')" id="key-E4" class="piano-key flex-1 bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#a16207] md:shadow-[0_8px_0_0_#a16207] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-sm">미</span>
+                        </button>
+                        <button data-note="F4" data-color="green" onclick="playKey('F4', 'green')" id="key-F4" class="piano-key flex-1 bg-green-500 hover:bg-green-400 active:bg-green-600 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#15803d] md:shadow-[0_8px_0_0_#15803d] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">파</span>
+                        </button>
+                        <button data-note="G4" data-color="skyblue" onclick="playKey('G4', 'skyblue')" id="key-G4" class="piano-key flex-1 bg-cyan-400 hover:bg-cyan-300 active:bg-cyan-500 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#0e7490] md:shadow-[0_8px_0_0_#0e7490] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">솔</span>
+                        </button>
+                        <button data-note="A4" data-color="blue" onclick="playKey('A4', 'blue')" id="key-A4" class="piano-key flex-1 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#1d4ed8] md:shadow-[0_8px_0_0_#1d4ed8] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">라</span>
+                        </button>
+                        <button data-note="B4" data-color="purple" onclick="playKey('B4', 'purple')" id="key-B4" class="piano-key flex-1 bg-purple-500 hover:bg-purple-400 active:bg-purple-600 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#7e22ce] md:shadow-[0_8px_0_0_#7e22ce] active:translate-y-2">
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">시</span>
+                        </button>
+                        <button data-note="C5" data-color="red" onclick="playKey('C5', 'red')" id="key-C5" class="piano-key flex-1 bg-red-500 hover:bg-red-400 active:bg-red-600 rounded-b-2xl flex flex-col justify-end items-center pb-4 md:pb-8 shadow-[0_6px_0_0_#b91c1c] md:shadow-[0_8px_0_0_#b91c1c] active:translate-y-2">
+                            <div class="w-2 md:w-3 h-2 md:h-3 bg-white rounded-full mb-1 md:mb-2"></div>
+                            <span class="text-white text-2xl md:text-5xl font-extrabold drop-shadow-md">도</span>
+                        </button>
+                    </div>
+
+                    <!-- Black Keys -->
+                    <div class="absolute top-0 left-0 w-full h-[55%] md:h-[60%] pointer-events-none flex">
+                        <button data-note="C#4" onclick="playKey('C#4', 'black')" class="absolute top-0 left-[8%] w-[6%] h-full bg-gray-900 rounded-b-lg pointer-events-auto hover:bg-gray-700 active:bg-black shadow-[0_4px_0_0_#000] active:translate-y-2 z-10"></button>
+                        <button data-note="D#4" onclick="playKey('D#4', 'black')" class="absolute top-0 left-[20.5%] w-[6%] h-full bg-gray-900 rounded-b-lg pointer-events-auto hover:bg-gray-700 active:bg-black shadow-[0_4px_0_0_#000] active:translate-y-2 z-10"></button>
+                        <button data-note="F#4" onclick="playKey('F#4', 'black')" class="absolute top-0 left-[45.5%] w-[6%] h-full bg-gray-900 rounded-b-lg pointer-events-auto hover:bg-gray-700 active:bg-black shadow-[0_4px_0_0_#000] active:translate-y-2 z-10"></button>
+                        <button data-note="G#4" onclick="playKey('G#4', 'black')" class="absolute top-0 left-[58%] w-[6%] h-full bg-gray-900 rounded-b-lg pointer-events-auto hover:bg-gray-700 active:bg-black shadow-[0_4px_0_0_#000] active:translate-y-2 z-10"></button>
+                        <button data-note="A#4" onclick="playKey('A#4', 'black')" class="absolute top-0 left-[70.5%] w-[6%] h-full bg-gray-900 rounded-b-lg pointer-events-auto hover:bg-gray-700 active:bg-black shadow-[0_4px_0_0_#000] active:translate-y-2 z-10"></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- End of App Wrapper -->
+
+    <script>
+        // --- Game State Variables ---
+        let currentSongKey = 'free';
+        let globalNoteIndex = 0;
+        let isAutoPlaying = false;
+        let autoPlayTimer = null;
+
+        // --- Screen Management ---
+        function showScreen(screenId) {
+            document.getElementById('screen-main').classList.add('hidden');
+            document.getElementById('screen-select').classList.add('hidden');
+            document.getElementById('screen-piano').classList.add('hidden');
+            
+            document.getElementById(screenId).classList.remove('hidden');
+            document.getElementById(screenId).classList.add('flex');
+        }
+
+        async function startGame() {
+            setFeedback("피아노 소리를 불러오고 있어요... 🎵");
+            await initAudio(); 
+            showScreen('screen-select');
+        }
+
+        function goBackToSelect() {
+            stopAutoPlay();
+            showScreen('screen-select');
+        }
+
+        // --- Audio Setup (Tone.js Sampler - Real Piano) ---
+        let sampler = null;
+        let isAudioInitialized = false;
+
+        async function initAudio() {
+            if (!isAudioInitialized) {
+                await Tone.start();
+                
+                sampler = new Tone.Sampler({
+                    urls: {
+                        C4: "C4.mp3",
+                        "D#4": "Ds4.mp3",
+                        "F#4": "Fs4.mp3",
+                        A4: "A4.mp3",
+                        C5: "C5.mp3"
+                    },
+                    release: 1,
+                    baseUrl: "https://tonejs.github.io/audio/salamander/"
+                }).toDestination();
+                
+                await Tone.loaded(); 
+                isAudioInitialized = true;
+                setFeedback("건반 색깔을 보고 순서대로 쳐보세요! 🎹");
+            }
+        }
+
+        // --- Song Data ---
+        const CM = { R:"red", O:"orange", Y:"yellow", G:"green", S:"skyblue", B:"blue", P:"purple" };
+        const N = (note, name, color, lyric, len = 1) => ({ note, name, color, lyric, len });
+
+        const songs = {
+            butterfly: {
+                title: "나 비 야", icon: "🦋",
+                notes: [
+                    N("G4","솔",CM.S,"나"), N("E4","미",CM.Y,"비"), N("E4","미",CM.Y,"야", 2),
+                    N("F4","파",CM.G,"나"), N("D4","레",CM.O,"비"), N("D4","레",CM.O,"야", 2),
+                    N("C4","도",CM.R,"이"), N("D4","레",CM.O,"리"), N("E4","미",CM.Y,"날"), N("F4","파",CM.G,"아"),
+                    N("G4","솔",CM.S,"오"), N("G4","솔",CM.S,"너"), N("G4","솔",CM.S,"라", 2),
+                    N("G4","솔",CM.S,"노"), N("E4","미",CM.Y,"랑"), N("E4","미",CM.Y,"나"), N("E4","미",CM.Y,"비"),
+                    N("F4","파",CM.G,"흰"), N("D4","레",CM.O,"나"), N("D4","레",CM.O,"비", 2),
+                    N("C4","도",CM.R,"춤"), N("E4","미",CM.Y,"을"), N("G4","솔",CM.S,"추"), N("G4","솔",CM.S,"며"),
+                    N("E4","미",CM.Y,"오"), N("E4","미",CM.Y,"너"), N("E4","미",CM.Y,"라", 2),
+                    N("D4","레",CM.O,"봄"), N("D4","레",CM.O,"바"), N("D4","레",CM.O,"람"), N("D4","레",CM.O,"에"),
+                    N("D4","레",CM.O,"꽃"), N("E4","미",CM.Y,"잎"), N("F4","파",CM.G,"도", 2),
+                    N("E4","미",CM.Y,"방"), N("E4","미",CM.Y,"긋"), N("E4","미",CM.Y,"방"), N("E4","미",CM.Y,"긋"),
+                    N("E4","미",CM.Y,"웃"), N("F4","파",CM.G,"으"), N("G4","솔",CM.S,"며", 2),
+                    N("G4","솔",CM.S,"참"), N("E4","미",CM.Y,"새"), N("E4","미",CM.Y,"도", 2),
+                    N("F4","파",CM.G,"짹"), N("D4","레",CM.O,"짹"), N("D4","레",CM.O,"짹", 2),
+                    N("C4","도",CM.R,"노"), N("E4","미",CM.Y,"래"), N("G4","솔",CM.S,"하"), N("G4","솔",CM.S,"며"),
+                    N("E4","미",CM.Y,"춤"), N("E4","미",CM.Y,"춘"), N("E4","미",CM.Y,"다", 2)
+                ]
+            },
+            twinkle: {
+                title: "작 은 별", icon: "⭐",
+                notes: [
+                    N("C4","도",CM.R,"반"), N("C4","도",CM.R,"짝"), N("G4","솔",CM.S,"반"), N("G4","솔",CM.S,"짝"),
+                    N("A4","라",CM.B,"작"), N("A4","라",CM.B,"은"), N("G4","솔",CM.S,"별", 2),
+                    N("F4","파",CM.G,"아"), N("F4","파",CM.G,"름"), N("E4","미",CM.Y,"답"), N("E4","미",CM.Y,"게"),
+                    N("D4","레",CM.O,"비"), N("D4","레",CM.O,"치"), N("C4","도",CM.R,"네", 2),
+                    N("G4","솔",CM.S,"동"), N("G4","솔",CM.S,"쪽"), N("F4","파",CM.G,"하"), N("F4","파",CM.G,"늘"),
+                    N("E4","미",CM.Y,"에"), N("E4","미",CM.Y,"서"), N("D4","레",CM.O,"도", 2),
+                    N("G4","솔",CM.S,"서"), N("G4","솔",CM.S,"쪽"), N("F4","파",CM.G,"하"), N("F4","파",CM.G,"늘"),
+                    N("E4","미",CM.Y,"에"), N("E4","미",CM.Y,"서"), N("D4","레",CM.O,"도", 2),
+                    N("C4","도",CM.R,"반"), N("C4","도",CM.R,"짝"), N("G4","솔",CM.S,"반"), N("G4","솔",CM.S,"짝"),
+                    N("A4","라",CM.B,"작"), N("A4","라",CM.B,"은"), N("G4","솔",CM.S,"별", 2),
+                    N("F4","파",CM.G,"아"), N("F4","파",CM.G,"름"), N("E4","미",CM.Y,"답"), N("E4","미",CM.Y,"게"),
+                    N("D4","레",CM.O,"비"), N("D4","레",CM.O,"치"), N("C4","도",CM.R,"네", 2)
+                ]
+            },
+            bears: {
+                title: "곰 세 마 리", icon: "🐻",
+                notes: [
+                    N("C4","도",CM.R,"곰"), N("C4","도",CM.R,"세"), N("C4","도",CM.R,"마"), N("C4","도",CM.R,"리"), N("C4","도",CM.R,"가"),
+                    N("E4","미",CM.Y,"한"), N("G4","솔",CM.S,"집"), N("G4","솔",CM.S,"에"), N("E4","미",CM.Y,"있"), N("C4","도",CM.R,"어", 2),
+                    N("G4","솔",CM.S,"아"), N("G4","솔",CM.S,"빠"), N("E4","미",CM.Y,"곰"), 
+                    N("G4","솔",CM.S,"엄"), N("G4","솔",CM.S,"마"), N("E4","미",CM.Y,"곰"),
+                    N("C4","도",CM.R,"애"), N("C4","도",CM.R,"기"), N("C4","도",CM.R,"곰", 2),
+                    N("G4","솔",CM.S,"아"), N("G4","솔",CM.S,"빠"), N("E4","미",CM.Y,"곰"), N("C4","도",CM.R,"은"),
+                    N("G4","솔",CM.S,"뚱"), N("G4","솔",CM.S,"뚱"), N("G4","솔",CM.S,"해", 2),
+                    N("G4","솔",CM.S,"엄"), N("G4","솔",CM.S,"마"), N("E4","미",CM.Y,"곰"), N("C4","도",CM.R,"은"),
+                    N("G4","솔",CM.S,"날"), N("G4","솔",CM.S,"씬"), N("G4","솔",CM.S,"해", 2),
+                    N("G4","솔",CM.S,"애"), N("G4","솔",CM.S,"기"), N("E4","미",CM.Y,"곰"), N("C4","도",CM.R,"은"),
+                    N("G4","솔",CM.S,"너"), N("G4","솔",CM.S,"무"), N("G4","솔",CM.S,"귀"), N("A4","라",CM.B,"여"), N("G4","솔",CM.S,"워", 2),
+                    N("C5","도",CM.R,"으"), N("G4","솔",CM.S,"쓱"), N("C5","도",CM.R,"으"), N("G4","솔",CM.S,"쓱"),
+                    N("E4","미",CM.Y,"잘"), N("D4","레",CM.O,"한"), N("C4","도",CM.R,"다", 2)
+                ]
+            },
+            apple: {
+                title: "사과같은<br>내 얼굴", icon: "🍎",
+                notes: [
+                    N("C4","도",CM.R,"사"), N("D4","레",CM.O,"과"), N("E4","미",CM.Y,"같"), N("E4","미",CM.Y,"은"), 
+                    N("F4","파",CM.G,"내"), N("E4","미",CM.Y,"얼"), N("D4","레",CM.O,"굴", 2),
+                    
+                    N("D4","레",CM.O,"예"), N("E4","미",CM.Y,"쁘"), N("F4","파",CM.G,"기"), N("F4","파",CM.G,"도"), 
+                    N("G4","솔",CM.S,"하"), N("F4","파",CM.G,"구"), N("E4","미",CM.Y,"나", 2),
+                    
+                    N("E4","미",CM.Y,"눈"), N("F4","파",CM.G,"도"), N("G4","솔",CM.S,"반"), N("G4","솔",CM.S,"짝"), 
+                    N("C5","도",CM.R,"코"), N("A4","라",CM.B,"도"), N("G4","솔",CM.S,"반"), N("G4","솔",CM.S,"짝"),
+                    
+                    N("C4","도",CM.R,"입"), N("D4","레",CM.O,"도"), N("E4","미",CM.Y,"반"), N("E4","미",CM.Y,"짝"), 
+                    N("D4","레",CM.O,"반"), N("C4","도",CM.R,"짝", 2)
+                ]
+            },
+            zoo: {
+                title: "작 은<br>동 물 원", icon: "🦁",
+                notes: [
+                    N("E4","미",CM.Y,"삐"), N("G4","솔",CM.S,"약"), N("E4","미",CM.Y,"삐"), N("G4","솔",CM.S,"약"), N("C4","도",CM.R,"병"), N("C4","도",CM.R,"아"), N("C4","도",CM.R,"리", 2),
+                    N("E4","미",CM.Y,"음"), N("G4","솔",CM.S,"매"), N("E4","미",CM.Y,"음"), N("G4","솔",CM.S,"매"), N("D4","레",CM.O,"송"), N("D4","레",CM.O,"아"), N("D4","레",CM.O,"지", 2),
+                    N("E4","미",CM.Y,"따"), N("G4","솔",CM.S,"당"), N("E4","미",CM.Y,"따"), N("G4","솔",CM.S,"당"), 
+                    N("F4","파",CM.G,"사"), N("F4","파",CM.G,"냥"), N("F4","파",CM.G,"꾼"), N("F4","파",CM.G,"뒤"), N("F4","파",CM.G,"뚱"),
+                    N("E4","미",CM.Y,"뒤"), N("E4","미",CM.Y,"뚱"), N("D4","레",CM.O,"물"), N("D4","레",CM.O,"오"), N("C4","도",CM.R,"리", 2),
+                    N("F4","파",CM.G,"푸"), N("A4","라",CM.B,"푸"), N("G4","솔",CM.S,"개"), N("A4","라",CM.B,"구"), N("G4","솔",CM.S,"리"), N("E4","미",CM.Y,"-"),
+                    N("F4","파",CM.G,"집"), N("E4","미",CM.Y,"게"), N("D4","레",CM.O,"집"), N("E4","미",CM.Y,"게"), N("F4","파",CM.G,"집"), N("D4","레",CM.O,"게"), N("E4","미",CM.Y,"가"), N("D4","레",CM.O,"재"), N("E4","미",CM.Y,"-"), N("G4","솔",CM.S,"-"),
+                    N("A4","라",CM.B,"푸"), N("A4","라",CM.B,"르"), N("A4","라",CM.B,"르"), N("A4","라",CM.B,"르"), N("A4","라",CM.B,"르"), N("C5","도",CM.R,"-"), N("C5","도",CM.R,"-"),
+                    N("G4","솔",CM.S,"물"), N("G4","솔",CM.S,"풀"), N("G4","솔",CM.S,"따"), N("G4","솔",CM.S,"단"), N("G4","솔",CM.S,"따"), N("A4","라",CM.B,"단"), N("B4","시",CM.P,"딴"), N("C5","도",CM.R,"소"), N("C5","도",CM.R,"라", 2)
+                ]
+            },
+            place: {
+                title: "모 두<br>제 자 리", icon: "🧸",
+                notes: [
+                    N("G4","솔",CM.S,"모"), N("G4","솔",CM.S,"두"), N("G4","솔",CM.S,"제"), N("F4","파",CM.G,"자"), N("E4","미",CM.Y,"리", 2),
+                    N("F4","파",CM.G,"모"), N("F4","파",CM.G,"두"), N("F4","파",CM.G,"제"), N("E4","미",CM.Y,"자"), N("D4","레",CM.O,"리", 2),
+                    N("E4","미",CM.Y,"모"), N("E4","미",CM.Y,"두"), N("E4","미",CM.Y,"모"), N("F4","파",CM.G,"두"), N("E4","미",CM.Y,"제"), N("C4","도",CM.R,"자"), N("D4","레",CM.O,"리", 2),
+                    N("G4","솔",CM.S,"모"), N("G4","솔",CM.S,"두"), N("G4","솔",CM.S,"제"), N("F4","파",CM.G,"자"), N("E4","미",CM.Y,"리", 2),
+                    N("F4","파",CM.G,"모"), N("F4","파",CM.G,"두"), N("F4","파",CM.G,"제"), N("E4","미",CM.Y,"자"), N("D4","레",CM.O,"리", 2),
+                    N("E4","미",CM.Y,"모"), N("E4","미",CM.Y,"두"), N("E4","미",CM.Y,"모"), N("F4","파",CM.G,"두"), N("E4","미",CM.Y,"제"), N("D4","레",CM.O,"자"), N("C4","도",CM.R,"리", 2)
+                ]
+            }
+        };
+
+        function selectSongAndPlay(songKey) {
+            showScreen('screen-piano');
+            currentSongKey = songKey;
+            globalNoteIndex = 0;
+            stopAutoPlay();
+            
+            const titleContainer = document.getElementById('current-song-title-container');
+            const targetBox = document.getElementById('target-box'); // 타겟 박스 요소 가져오기
+
+            if (songKey === 'free') {
+                titleContainer.innerHTML = '<h2 class="text-xl md:text-2xl font-black text-indigo-700 w-full text-center py-2">자유 연주</h2>';
+                document.getElementById('progress-bar').style.width = '0%';
+                document.getElementById('sheet-notes-box').innerHTML = '<div class="text-xl md:text-3xl text-gray-500 font-bold p-8 text-center mt-6">자유롭게<br>연주해보세요!</div>';
+                setFeedback("자유롭게 피아노를 쳐보세요! 🎵");
+                document.getElementById('sheet-notes-box').style.transform = `translateX(0px)`;
+                
+                // 자유 연주 시 타겟 박스 숨기기
+                if (targetBox) targetBox.style.display = 'none'; 
+            } else if (songs[songKey]) {
+                const song = songs[songKey];
+                
+                // 곡에 맞는 캐릭터와 제목 넣어주기 (왼쪽 아이콘, 오른쪽 텍스트 가운데 정렬)
+                titleContainer.innerHTML = `
+                    <div class="w-[40%] flex justify-center items-center text-4xl md:text-5xl shrink-0">${song.icon}</div>
+                    <div class="w-[60%] flex justify-center items-center shrink-0">
+                        <div class="text-lg md:text-2xl font-bold text-indigo-700 text-center leading-tight">${song.title}</div>
+                    </div>
+                `;
+                
+                // 다른 곡 선택 시 타겟 박스 다시 보이기
+                if (targetBox) targetBox.style.display = 'flex';
+                updateProgressBar();
+                renderSheet(true);
+                if(!isAudioInitialized) initAudio(); 
+                else setFeedback("건반 색깔을 보고 순서대로 쳐보세요! 🎹");
+            }
+        }
+
+        function updateProgressBar() {
+            if (currentSongKey === 'free' || !songs[currentSongKey]) return;
+            const song = songs[currentSongKey];
+            const progress = (globalNoteIndex / song.notes.length) * 100;
+            document.getElementById('progress-bar').style.width = `${progress}%`;
+        }
+
+        function renderSheet(isInitial = false) {
+            if (currentSongKey === 'free' || !songs[currentSongKey]) return;
+            
+            const box = document.getElementById('sheet-notes-box');
+            const song = songs[currentSongKey];
+            
+            if (isInitial) {
+                box.style.transition = 'none';
+                box.style.transform = 'translateX(0px)';
+                box.innerHTML = '';
+                
+                const colorClassMap = {
+                    red: "bg-red-500 text-white", orange: "bg-orange-500 text-white", yellow: "bg-yellow-400 text-white",
+                    green: "bg-green-500 text-white", skyblue: "bg-cyan-400 text-white", blue: "bg-blue-600 text-white",
+                    purple: "bg-purple-500 text-white", black: "bg-gray-800 text-white"
+                };
+
+                song.notes.forEach((item, idx) => {
+                    const noteDiv = document.createElement('div');
+                    noteDiv.id = `note-ui-${idx}`;
+                    const bgCol = colorClassMap[item.color] || "bg-gray-400 text-white";
+                    
+                    const shapeClasses = item.len === 2 
+                        ? "w-16 md:w-24 h-12 md:h-16 rounded-full" 
+                        : "w-12 md:w-16 h-12 md:h-16 rounded-full";
+
+                    noteDiv.className = `note-transition flex flex-col items-center justify-center ${shapeClasses} ${bgCol} shadow-md shrink-0 relative upcoming-note`;
+                    
+                    let highDotHtml = '';
+                    if(item.note === 'C5') {
+                        highDotHtml = '<div class="absolute -top-2 md:-top-3 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"></div>';
+                    }
+
+                    noteDiv.innerHTML = `
+                        <span class="text-[10px] md:text-sm font-bold absolute -top-5 md:-top-7 text-gray-800 whitespace-nowrap bg-white/90 px-2 py-0.5 rounded-full lyric-text shadow-sm">${item.lyric}</span>
+                        <span class="text-lg md:text-2xl font-extrabold drop-shadow-sm text-white relative flex items-center justify-center">
+                            ${highDotHtml}
+                            ${item.name}
+                        </span>
+                    `;
+                    box.appendChild(noteDiv);
+                });
+                
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        box.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+                        updateNoteStates();
+                    });
+                });
+            } else {
+                updateNoteStates();
+            }
+        }
+
+        function updateNoteStates() {
+            if (currentSongKey === 'free' || !songs[currentSongKey]) return;
+            const box = document.getElementById('sheet-notes-box');
+            const song = songs[currentSongKey];
+            
+            song.notes.forEach((item, idx) => {
+                const noteDiv = document.getElementById(`note-ui-${idx}`);
+                if (!noteDiv) return;
+
+                if (idx < globalNoteIndex) {
+                    noteDiv.classList.add('played-note');
+                    noteDiv.classList.remove('current-note', 'upcoming-note');
+                } else if (idx === globalNoteIndex) {
+                    noteDiv.classList.remove('played-note', 'upcoming-note');
+                    noteDiv.classList.add('current-note'); 
+                } else {
+                    noteDiv.classList.remove('played-note', 'current-note');
+                    noteDiv.classList.add('upcoming-note'); 
+                }
+            });
+
+            const currentNoteEl = document.getElementById(`note-ui-${globalNoteIndex}`);
+            if (currentNoteEl) {
+                const centerOffset = currentNoteEl.offsetLeft + (currentNoteEl.offsetWidth / 2); 
+                box.style.transform = `translateX(-${centerOffset}px)`;
+            }
+        }
+
+        async function playKey(note, color) {
+            await initAudio();
+            
+            let noteLen = "4n"; 
+            if (currentSongKey !== 'free' && songs[currentSongKey] && globalNoteIndex < songs[currentSongKey].notes.length) {
+                if(songs[currentSongKey].notes[globalNoteIndex].note === note) {
+                    noteLen = songs[currentSongKey].notes[globalNoteIndex].len === 2 ? "2n" : "4n";
+                }
+            }
+            
+            if (sampler && isAudioInitialized) {
+                sampler.triggerAttackRelease(note, noteLen);
+            }
+
+            const keyEl = document.getElementById(`key-${note}`);
+            if (keyEl) {
+                keyEl.classList.add(`key-glow-${color}`);
+                const originalPb = keyEl.style.paddingBottom;
+                keyEl.style.paddingBottom = "20px"; 
+                setTimeout(() => {
+                    keyEl.classList.remove(`key-glow-${color}`);
+                    keyEl.style.paddingBottom = originalPb;
+                }, 200);
+            }
+
+            if (currentSongKey !== 'free' && !isAutoPlaying && songs[currentSongKey]) {
+                const song = songs[currentSongKey];
+                if (globalNoteIndex < song.notes.length) {
+                    const expectedNote = song.notes[globalNoteIndex];
+                    
+                    if (expectedNote.note === note) {
+                        globalNoteIndex++;
+                        updateProgressBar();
+                        
+                        if (globalNoteIndex >= song.notes.length) {
+                            setFeedback("🎉 와아! 최고예요! 멋진 연주였어요!", "success");
+                            fireConfetti(); 
+                        } else {
+                            setFeedback("👍 잘했어요! 다음 색깔 꾹!", "correct");
+                        }
+                        renderSheet(false);
+                    } else {
+                        setFeedback(`❌ 앗! 지금은 [${expectedNote.name}] 색깔이에요!`, "error");
+                        const correctKeyEl = document.getElementById(`key-${expectedNote.note}`);
+                        if(correctKeyEl) {
+                            correctKeyEl.classList.add('animate-bounce');
+                            setTimeout(() => correctKeyEl.classList.remove('animate-bounce'), 500);
+                        }
+                    }
+                }
+            }
+        }
+
+        function fireConfetti() {
+            var count = 200;
+            var defaults = { origin: { y: 0.6 }, zIndex: 9999 };
+
+            function fire(particleRatio, opts) {
+                confetti(Object.assign({}, defaults, opts, {
+                    particleCount: Math.floor(count * particleRatio)
+                }));
+            }
+
+            fire(0.25, { spread: 26, startVelocity: 55 });
+            fire(0.2, { spread: 60 });
+            fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+            fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+            fire(0.1, { spread: 120, startVelocity: 45 });
+        }
+
+        function setFeedback(msg, type = 'info') {
+            const fb = document.getElementById('feedback-msg');
+            fb.innerText = msg;
+            
+            fb.classList.remove('animate-bounce-slow', 'text-rose-500', 'text-blue-600', 'text-indigo-600', 'text-emerald-500');
+            
+            let colorClass = 'text-indigo-600'; 
+            if (type === 'correct') colorClass = 'text-blue-600'; 
+            else if (type === 'error') colorClass = 'text-rose-500'; 
+            else if (type === 'success') colorClass = 'text-emerald-500'; 
+
+            fb.classList.add('scale-110', colorClass);
+            
+            setTimeout(() => {
+                fb.classList.remove('scale-110');
+                fb.classList.add('animate-bounce-slow'); 
+            }, 300);
+        }
+
+        function resetSong() {
+            stopAutoPlay();
+            globalNoteIndex = 0;
+            updateProgressBar();
+            renderSheet(true);
+            setFeedback("처음부터 다시 시작! 화이팅! 💪");
+        }
+
+        function toggleAutoPlay() {
+            if (currentSongKey === 'free') {
+                setFeedback("자유 연주에서는 선생님 연주를 들을 수 없어요.");
+                return;
+            }
+            if (isAutoPlaying) stopAutoPlay();
+            else startAutoPlay();
+        }
+
+        function startAutoPlay() {
+            isAutoPlaying = true;
+            const btn = document.getElementById('autoplay-btn');
+            btn.innerHTML = "<span>⏹ 멈추기</span>";
+            btn.classList.replace('bg-emerald-500', 'bg-amber-500');
+            btn.classList.replace('hover:bg-emerald-600', 'hover:bg-amber-600');
+
+            const song = songs[currentSongKey];
+            
+            if (globalNoteIndex >= song.notes.length) {
+                globalNoteIndex = 0;
+                updateProgressBar();
+                renderSheet(true);
+            }
+
+            setFeedback("✨ 선생님의 연주를 잘 들어보세요!");
+
+            async function playNextAuto() {
+                if (!isAutoPlaying) return;
+                
+                if (globalNoteIndex < song.notes.length) {
+                    const item = song.notes[globalNoteIndex];
+                    
+                    await initAudio();
+                    const noteDur = item.len === 2 ? "2n" : "4n";
+                    if (sampler && isAudioInitialized) {
+                        sampler.triggerAttackRelease(item.note, noteDur);
+                    }
+                    
+                    const keyEl = document.getElementById(`key-${item.note}`);
+                    if (keyEl) {
+                        keyEl.classList.add(`key-glow-${item.color}`);
+                        setTimeout(() => keyEl.classList.remove(`key-glow-${item.color}`), 300);
+                    }
+
+                    globalNoteIndex++;
+                    updateProgressBar();
+                    renderSheet(false);
+                    
+                    const delay = item.len === 2 ? 1100 : 600;
+                    autoPlayTimer = setTimeout(playNextAuto, delay);
+                    
+                } else {
+                    stopAutoPlay();
+                    setFeedback("연주 끝! 이제 직접 쳐볼까요?");
+                }
+            }
+            
+            playNextAuto();
+        }
+
+        function stopAutoPlay() {
+            isAutoPlaying = false;
+            if (autoPlayTimer) clearTimeout(autoPlayTimer);
+            autoPlayTimer = null;
+            
+            const btn = document.getElementById('autoplay-btn');
+            if (btn) {
+                btn.innerHTML = "<span>✨ 선생님 연주 듣기</span>";
+                btn.classList.replace('bg-amber-500', 'bg-emerald-500');
+                btn.classList.replace('hover:bg-amber-600', 'hover:bg-emerald-600');
+            }
+        }
+    </script>
+</body>
+</html>
